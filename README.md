@@ -1,11 +1,23 @@
-<div align="center">
+# 💈 The Prince AI Barber Coach
 
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+Prototype AI assistant for barbers.
 
-  <h1>Built with AI Studio</h2>
+## Features (v0.1)
 
-  <p>The fastest path from prompt to production with Gemini.</p>
+- Telegram bot for receiving haircut photos
+- AI barber analysis prompt
+- Technical feedback: fade, blend, contours, symmetry
+- Ready for Firebase, n8n and PWA integration
 
-  <a href="https://aistudio.google.com/apps">Start building</a>
+## Project vision
 
-</div>
+The Prince AI helps barbers improve technique and keep a digital history of haircuts.
+
+## Roadmap
+
+- [x] Project initialization
+- [ ] Telegram bot
+- [ ] AI Vision analysis
+- [ ] Firebase database
+- [ ] Web dashboard
+- [ ] Mobile PWA

@@ -1,0 +1,6 @@
+{
+  "name": "The Prince AI Barber Coach",
+  "description": "Professional Barber AI Coach for technical haircut analysis using Gemini 2.0 Flash.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
