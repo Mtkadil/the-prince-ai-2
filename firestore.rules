@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity validation
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt', 'updatedAt'])
+        && data.keys().size() <= 6
+        && data.uid is string && data.uid == request.auth.uid
+        && data.email is string && data.email.size() <= 256
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function isValidAnalysis(data) {
+      return data.keys().hasAll(['userId', 'report', 'createdAt'])
+        && data.keys().size() <= 4
+        && data.userId is string && data.userId == request.auth.uid
+        && data.report is string && data.report.size() <= 10000
+        && data.createdAt == request.time;
+    }
+
+    // Matches
+    match /users/{userId} {
+      allow get: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && isEmailVerified() && isValidId(userId) && userId == request.auth.uid && isValidUser(incoming());
+      allow update: if isSignedIn() && isEmailVerified() && userId == request.auth.uid 
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'updatedAt'])
+        && incoming().updatedAt == request.time;
+    }
+
+    match /analyses/{analysisId} {
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && isEmailVerified() && isValidId(analysisId) && isValidAnalysis(incoming());
+      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+    }
+  }
+}

@@ -1,3 +1,17 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": [
+    "next/core-web-vitals"
+  ],
+  "plugins": [
+    "@firebase/security-rules"
+  ],
+  "overrides": [
+    {
+      "files": ["*.rules"],
+      "parser": "@firebase/eslint-plugin-security-rules/parser",
+      "rules": {
+        "@firebase/security-rules/no-unprotected-collections": "error"
+      }
+    }
+  ]
 }

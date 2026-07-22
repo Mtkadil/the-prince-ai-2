@@ -1,23 +1,58 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "motion/react";
-import { Camera, Upload, Scissors, RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { Camera, Upload, Scissors, RefreshCw, CheckCircle2, AlertCircle, LogIn, LogOut, History, User as UserIcon } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { auth, db } from "@/lib/firebase";
+import { signInWithPopup, GoogleAuthProvider, signOut } from "firebase/auth";
+import { collection, addDoc, serverTimestamp, query, where, orderBy, getDocs, limit } from "firebase/firestore";
+import { useAuth } from "@/components/FirebaseProvider";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
 export default function BarberCoachPage() {
+  const { user, loading: authLoading } = useAuth();
   const [image, setImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [report, setReport] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const login = () => signInWithPopup(auth, new GoogleAuthProvider());
+  const logout = () => signOut(auth);
+
+  const fetchHistory = useCallback(async () => {
+    if (!user) return;
+    try {
+      const q = query(
+        collection(db, "analyses"),
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        limit(5)
+      );
+      const querySnapshot = await getDocs(q);
+      const docs = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setHistory(docs);
+    } catch (err) {
+      console.error("Error fetching history:", err);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchHistory();
+    } else {
+      setHistory([]);
+    }
+  }, [user, fetchHistory]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -67,6 +102,20 @@ export default function BarberCoachPage() {
       if (!response.ok) throw new Error(data.error || "Analysis failed");
 
       setReport(data.analysis);
+
+      // Save to Firestore if user is logged in
+      if (user) {
+        try {
+          await addDoc(collection(db, "analyses"), {
+            userId: user.uid,
+            report: data.analysis,
+            createdAt: serverTimestamp(),
+          });
+          fetchHistory();
+        } catch (dbErr) {
+          console.error("Failed to save analysis:", dbErr);
+        }
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -91,7 +140,56 @@ export default function BarberCoachPage() {
         className="max-w-4xl mx-auto px-6 py-12"
       >
         {/* Header */}
-        <header className="mb-16 text-center space-y-4">
+        <header className="mb-16 flex flex-col items-center space-y-4">
+          <div className="w-full flex justify-end mb-8">
+            <AnimatePresence mode="wait">
+              {authLoading ? (
+                <div className="w-8 h-8 rounded-full border-2 border-zinc-800 border-t-zinc-400 animate-spin" />
+              ) : user ? (
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center gap-4"
+                >
+                  <div className="flex flex-col items-end">
+                    <p className="text-sm font-medium text-white">{user.displayName}</p>
+                    <button 
+                      onClick={logout}
+                      className="text-[10px] text-zinc-500 hover:text-zinc-300 uppercase tracking-widest transition-colors flex items-center gap-1"
+                    >
+                      <LogOut className="w-3 h-3" />
+                      Logout
+                    </button>
+                  </div>
+                  {user.photoURL ? (
+                    <Image 
+                      src={user.photoURL} 
+                      alt="Avatar" 
+                      width={40} 
+                      height={40} 
+                      className="rounded-full border border-zinc-800 shadow-lg" 
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center border border-zinc-700">
+                      <UserIcon className="w-5 h-5 text-zinc-400" />
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.button
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  onClick={login}
+                  className="px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-medium text-zinc-400 hover:text-white hover:border-zinc-700 transition-all flex items-center gap-2"
+                >
+                  <LogIn className="w-4 h-4" />
+                  Sign In to Save History
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
+
           <motion.div
             variants={itemVariants}
             className="inline-flex items-center justify-center w-16 h-16 bg-zinc-900 border border-zinc-800 rounded-2xl mb-4 shadow-2xl shadow-zinc-900"
@@ -219,14 +317,54 @@ export default function BarberCoachPage() {
 
           {/* Results Section */}
           <motion.section variants={itemVariants} className="space-y-6">
-            <h2 className="text-lg font-medium text-zinc-400 flex items-center gap-3 tracking-tight">
-              <CheckCircle2 className="w-5 h-5 text-zinc-500" />
-              REPORT TECNICO
-            </h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-medium text-zinc-400 flex items-center gap-3 tracking-tight">
+                <CheckCircle2 className="w-5 h-5 text-zinc-500" />
+                {showHistory ? "CRONOLOGIA" : "REPORT TECNICO"}
+              </h2>
+              {user && history.length > 0 && (
+                <button 
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="text-xs text-zinc-500 hover:text-white transition-colors flex items-center gap-2"
+                >
+                  {showHistory ? <Scissors className="w-3 h-3" /> : <History className="w-3 h-3" />}
+                  {showHistory ? "Torna all'analisi" : "Cronologia"}
+                </button>
+              )}
+            </div>
 
             <div className="bg-zinc-900/40 border border-zinc-800/60 rounded-3xl p-8 min-h-[400px] relative shadow-inner overflow-hidden">
               <AnimatePresence mode="wait">
-                {report ? (
+                {showHistory ? (
+                  <motion.div
+                    key="history"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="space-y-4"
+                  >
+                    {history.map((item) => (
+                      <div 
+                        key={item.id} 
+                        className="p-4 bg-zinc-800/20 border border-zinc-800/50 rounded-2xl cursor-pointer hover:bg-zinc-800/40 transition-colors group"
+                        onClick={() => {
+                          setReport(item.report);
+                          setShowHistory(false);
+                        }}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <p className="text-[10px] text-zinc-500 font-mono">
+                            {item.createdAt?.toDate().toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <History className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                        </div>
+                        <p className="text-zinc-400 text-sm line-clamp-2 font-light italic">
+                          {item.report.substring(0, 100)}...
+                        </p>
+                      </div>
+                    ))}
+                  </motion.div>
+                ) : report ? (
                   <motion.div
                     key="report"
                     initial={{ opacity: 0, y: 20 }}
