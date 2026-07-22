@@ -17,7 +17,7 @@ The Prince AI helps barbers improve technique and keep a digital history of hair
 
 - [x] Project initialization
 - [ ] Telegram bot
-- [ ] AI Vision analysis
-- [ ] Firebase database
-- [ ] Web dashboard
-- [ ] Mobile PWA
+- [x] AI Vision analysis
+- [x] Firebase database
+- [x] Web dashboard
+- [x] Mobile PWA
